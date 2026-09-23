@@ -22,14 +22,56 @@ export const searchProducts = async (
   skip = 0,
   signal
 ) => {
+  const response = await api.get("/products/search", {
+    params: {
+      q: query,
+      limit,
+      skip,
+    },
+    signal,
+  });
+
+  return response.data;
+};
+
+export const getCategories = async (signal) => {
   const response = await api.get(
-    "/products/search",
+    "/products/categories",
+    {
+      signal,
+    }
+  );
+
+  return response.data;
+};
+
+export const getProductsByCategory = async (
+  category,
+  limit = 10,
+  skip = 0,
+  signal
+) => {
+  const response = await api.get(
+    `/products/category/${category}`,
     {
       params: {
-        q: query,
         limit,
         skip,
       },
+      signal,
+    }
+  );
+
+  return response.data;
+};
+
+export const getProductById = async (
+  id,
+  signal
+) => {
+  const response = await api.get(
+    `/products/${id}`,
+    {
       signal,
     }
   );

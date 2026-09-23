@@ -14,6 +14,8 @@ import { isAuthenticated, logout } from "@/utils/auth";
 import {
   getProducts,
   searchProducts,
+  getCategories,
+  getProductsByCategory,
 } from "@/services/productService";
 
 import ProductTable from "@/components/ProductTable";
@@ -23,6 +25,7 @@ import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
+import FilterBar from "@/components/FilterBar";
 
 const ALLOWED_PAGE_SIZES = [10, 20, 50];
 
@@ -30,40 +33,30 @@ function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  /*
-   * ============================================================
-   * URL PARAMETERS
-   * ============================================================
-   */
+  // -----------------------------
+  // Read values from URL
+  // -----------------------------
 
   const rawPage = Number(searchParams.get("page"));
   const rawLimit = Number(searchParams.get("limit"));
 
   const currentPage =
-    Number.isInteger(rawPage) && rawPage > 0
-      ? rawPage
-      : 1;
+    Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
   const pageSize = ALLOWED_PAGE_SIZES.includes(rawLimit)
     ? rawLimit
     : 10;
 
   const searchQuery = searchParams.get("search") || "";
+  const category = searchParams.get("category") || "";
+  const sort = searchParams.get("sort") || "";
 
-  /*
-   * ============================================================
-   * AUTHENTICATION STATE
-   * ============================================================
-   */
+  // -----------------------------
+  // State
+  // -----------------------------
 
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
-
-  /*
-   * ============================================================
-   * PRODUCT STATE
-   * ============================================================
-   */
 
   const [products, setProducts] = useState([]);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -71,30 +64,18 @@ function ProductsContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  /*
-   * ============================================================
-   * SEARCH STATE
-   * ============================================================
-   */
+  const [searchInput, setSearchInput] =
+    useState(searchQuery);
 
-  // What the user currently sees inside the input
-  const [searchInput, setSearchInput] = useState(searchQuery);
+  const [categories, setCategories] = useState([]);
 
-  /*
-   * ============================================================
-   * REQUEST CONTROL
-   * ============================================================
-   */
-
-  // Stores the current AbortController.
-  // Used to cancel an older API request when a new one starts.
+  // Used to cancel old API requests
+  // when a new request starts.
   const abortControllerRef = useRef(null);
 
-  /*
-   * ============================================================
-   * AUTHENTICATION CHECK
-   * ============================================================
-   */
+  // -----------------------------
+  // Authentication check
+  // -----------------------------
 
   useEffect(() => {
     const authenticatedUser = isAuthenticated();
@@ -108,47 +89,48 @@ function ProductsContent() {
     setIsCheckingAuth(false);
   }, [router]);
 
-  /*
-   * ============================================================
-   * KEEP SEARCH INPUT IN SYNC WITH URL
-   * ============================================================
-   *
-   * Example:
-   *
-   * URL:
-   * /products?search=phone
-   *
-   * Search input:
-   * phone
-   *
-   * If the URL changes externally, the input also changes.
-   */
+  // -----------------------------
+  // Keep search input
+  // synchronized with URL
+  // -----------------------------
 
   useEffect(() => {
     setSearchInput(searchQuery);
   }, [searchQuery]);
 
-  /*
-   * ============================================================
-   * LOAD PRODUCTS
-   * ============================================================
-   */
+  // -----------------------------
+  // Load categories
+  // -----------------------------
+
+  useEffect(() => {
+    if (!authenticated) return;
+
+    const loadCategories = async () => {
+      try {
+        const data = await getCategories();
+
+        if (Array.isArray(data)) {
+          setCategories(data);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load categories:",
+          error
+        );
+      }
+    };
+
+    loadCategories();
+  }, [authenticated]);
+
+  // -----------------------------
+  // Load products
+  // -----------------------------
 
   const loadProducts = useCallback(async () => {
-    if (!authenticated) {
-      return;
-    }
+    if (!authenticated) return;
 
-    /*
-     * Cancel the previous request.
-     *
-     * Example:
-     *
-     * Request A → phone
-     * Request B → laptop
-     *
-     * When B starts, A is cancelled.
-     */
+    // Cancel previous request.
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -165,16 +147,21 @@ function ProductsContent() {
 
       let data;
 
-      /*
-       * If search exists:
-       *
-       * /products/search?q=phone
-       *
-       * Otherwise:
-       *
-       * /products
-       */
-      if (searchQuery.trim()) {
+      // -----------------------------------
+      // Category has priority over search.
+      //
+      // DummyJSON does not support combining
+      // search and category in one endpoint.
+      // -----------------------------------
+
+      if (category) {
+        data = await getProductsByCategory(
+          category,
+          pageSize,
+          skip,
+          controller.signal
+        );
+      } else if (searchQuery.trim()) {
         data = await searchProducts(
           searchQuery.trim(),
           pageSize,
@@ -189,28 +176,48 @@ function ProductsContent() {
         );
       }
 
-      /*
-       * If this request was cancelled,
-       * don't use its result.
-       */
+      // Ignore cancelled request.
       if (controller.signal.aborted) {
         return;
       }
 
-      setProducts(data.products || []);
+      // -----------------------------
+      // Sort products
+      // -----------------------------
+
+      let loadedProducts = data.products || [];
+
+      if (sort === "price-asc") {
+        loadedProducts = [...loadedProducts].sort(
+          (a, b) => a.price - b.price
+        );
+      }
+
+      if (sort === "price-desc") {
+        loadedProducts = [...loadedProducts].sort(
+          (a, b) => b.price - a.price
+        );
+      }
+
+      if (sort === "rating-desc") {
+        loadedProducts = [...loadedProducts].sort(
+          (a, b) => b.rating - a.rating
+        );
+      }
+
+      if (sort === "title-asc") {
+        loadedProducts = [...loadedProducts].sort(
+          (a, b) =>
+            a.title.localeCompare(b.title)
+        );
+      }
+
+      setProducts(loadedProducts);
       setTotalProducts(data.total || 0);
 
-      /*
-       * ========================================================
-       * HANDLE INVALID PAGE NUMBERS
-       * ========================================================
-       *
-       * Example:
-       *
-       * ?page=999&limit=10
-       *
-       * If only 20 pages exist, go to page 20.
-       */
+      // -----------------------------
+      // Handle invalid/high page
+      // -----------------------------
 
       const calculatedTotalPages = Math.ceil(
         (data.total || 0) / pageSize
@@ -229,7 +236,10 @@ function ProductsContent() {
           String(calculatedTotalPages)
         );
 
-        params.set("limit", String(pageSize));
+        params.set(
+          "limit",
+          String(pageSize)
+        );
 
         router.replace(
           `/products?${params.toString()}`
@@ -238,11 +248,7 @@ function ProductsContent() {
         return;
       }
     } catch (error) {
-      /*
-       * AbortController cancellation is expected.
-       *
-       * It should NOT display an error to the user.
-       */
+      // Ignore cancelled requests.
       if (
         error.code === "ERR_CANCELED" ||
         error.name === "CanceledError" ||
@@ -258,12 +264,6 @@ function ProductsContent() {
 
       setError(true);
     } finally {
-      /*
-       * Don't stop the loading state for an
-       * already-cancelled request.
-       *
-       * The latest request controls loading.
-       */
       if (!controller.signal.aborted) {
         setLoading(false);
       }
@@ -273,46 +273,27 @@ function ProductsContent() {
     currentPage,
     pageSize,
     searchQuery,
+    category,
+    sort,
     router,
     searchParams,
   ]);
 
-  /*
-   * ============================================================
-   * LOAD DATA WHEN URL / AUTH STATE CHANGES
-   * ============================================================
-   */
-
+  // Load products whenever
+  // URL/filter/search values change.
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
-  /*
-   * ============================================================
-   * DEBOUNCED SEARCH
-   * ============================================================
-   *
-   * Wait 500ms after the user stops typing.
-   *
-   * Example:
-   *
-   * p
-   * ph
-   * pho
-   * phon
-   * phone
-   *
-   * We don't immediately update the URL/API
-   * for every keystroke.
-   */
+  // -----------------------------
+  // Search debounce
+  // -----------------------------
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const trimmedSearch = searchInput.trim();
 
-      /*
-       * Nothing changed.
-       */
+      // Nothing changed.
       if (trimmedSearch === searchQuery) {
         return;
       }
@@ -321,23 +302,17 @@ function ProductsContent() {
         searchParams.toString()
       );
 
-      /*
-       * Add or remove search parameter.
-       */
       if (trimmedSearch) {
         params.set("search", trimmedSearch);
+
+        // Search and category cannot be combined
+        // using DummyJSON endpoints.
+        params.delete("category");
       } else {
         params.delete("search");
       }
 
-      /*
-       * Search changes must always go back to page 1.
-       */
       params.set("page", "1");
-
-      /*
-       * Keep current page size.
-       */
       params.set("limit", String(pageSize));
 
       router.push(
@@ -345,13 +320,7 @@ function ProductsContent() {
       );
     }, 500);
 
-    /*
-     * Cancel the timer if the user types again
-     * before 500ms.
-     */
-    return () => {
-      clearTimeout(timeoutId);
-    };
+    return () => clearTimeout(timeoutId);
   }, [
     searchInput,
     searchQuery,
@@ -360,16 +329,12 @@ function ProductsContent() {
     router,
   ]);
 
-  /*
-   * ============================================================
-   * PAGE CHANGE
-   * ============================================================
-   */
+  // -----------------------------
+  // Pagination
+  // -----------------------------
 
   const handlePageChange = (page) => {
-    if (page < 1) {
-      return;
-    }
+    if (page < 1) return;
 
     const params = new URLSearchParams(
       searchParams.toString()
@@ -383,17 +348,14 @@ function ProductsContent() {
     );
   };
 
-  /*
-   * ============================================================
-   * PAGE SIZE CHANGE
-   * ============================================================
-   *
-   * When page size changes,
-   * always go back to page 1.
-   */
+  // -----------------------------
+  // Page size
+  // -----------------------------
 
   const handlePageSizeChange = (newPageSize) => {
-    if (!ALLOWED_PAGE_SIZES.includes(newPageSize)) {
+    if (
+      !ALLOWED_PAGE_SIZES.includes(newPageSize)
+    ) {
       return;
     }
 
@@ -402,39 +364,102 @@ function ProductsContent() {
     );
 
     params.set("page", "1");
-    params.set("limit", String(newPageSize));
+    params.set(
+      "limit",
+      String(newPageSize)
+    );
 
     router.push(
       `/products?${params.toString()}`
     );
   };
 
-  /*
-   * ============================================================
-   * SEARCH INPUT CHANGE
-   * ============================================================
-   */
+  // -----------------------------
+  // Search
+  // -----------------------------
 
   const handleSearchChange = (value) => {
     setSearchInput(value);
   };
 
-  /*
-   * ============================================================
-   * LOGOUT
-   * ============================================================
-   */
+  // -----------------------------
+  // Category filter
+  // -----------------------------
+
+  const handleCategoryChange = (
+    newCategory
+  ) => {
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    if (newCategory) {
+      params.set(
+        "category",
+        newCategory
+      );
+
+      // Category takes priority over search.
+      params.delete("search");
+
+      setSearchInput("");
+    } else {
+      params.delete("category");
+    }
+
+    // Changing a filter should start
+    // from page 1.
+    params.set("page", "1");
+    params.set(
+      "limit",
+      String(pageSize)
+    );
+
+    router.push(
+      `/products?${params.toString()}`
+    );
+  };
+
+  // -----------------------------
+  // Sorting
+  // -----------------------------
+
+  const handleSortChange = (newSort) => {
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    if (newSort) {
+      params.set("sort", newSort);
+    } else {
+      params.delete("sort");
+    }
+
+    // Changing sort should start
+    // from page 1.
+    params.set("page", "1");
+    params.set(
+      "limit",
+      String(pageSize)
+    );
+
+    router.push(
+      `/products?${params.toString()}`
+    );
+  };
+
+  // -----------------------------
+  // Logout
+  // -----------------------------
 
   const handleLogout = () => {
     logout();
     router.replace("/login");
   };
 
-  /*
-   * ============================================================
-   * AUTH LOADING
-   * ============================================================
-   */
+  // -----------------------------
+  // Authentication loading
+  // -----------------------------
 
   if (isCheckingAuth) {
     return (
@@ -450,11 +475,9 @@ function ProductsContent() {
     return null;
   }
 
-  /*
-   * ============================================================
-   * PAGINATION CALCULATIONS
-   * ============================================================
-   */
+  // -----------------------------
+  // Pagination calculations
+  // -----------------------------
 
   const totalPages = Math.ceil(
     totalProducts / pageSize
@@ -470,20 +493,15 @@ function ProductsContent() {
     totalProducts
   );
 
-  /*
-   * ============================================================
-   * UI
-   * ============================================================
-   */
+  // -----------------------------
+  // UI
+  // -----------------------------
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
 
-        {/* ================================================== */}
-        {/* HEADER */}
-        {/* ================================================== */}
-
+        {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -503,60 +521,61 @@ function ProductsContent() {
           </button>
         </div>
 
-        {/* ================================================== */}
-        {/* SEARCH */}
-        {/* ================================================== */}
+        {/* Search and Filters */}
+        <div className="mb-6 space-y-4">
 
-        <div className="mb-6">
+          {/* Search */}
           <div className="w-full md:max-w-xl">
             <SearchBar
               value={searchInput}
               onChange={handleSearchChange}
             />
           </div>
+
+          {/* Category + Sort */}
+          <FilterBar
+            category={category}
+            categories={categories}
+            sort={sort}
+            onCategoryChange={
+              handleCategoryChange
+            }
+            onSortChange={
+              handleSortChange
+            }
+          />
+
         </div>
 
-        {/* ================================================== */}
-        {/* LOADING */}
-        {/* ================================================== */}
-
+        {/* Loading */}
         {loading && <LoadingState />}
 
-        {/* ================================================== */}
-        {/* ERROR */}
-        {/* ================================================== */}
-
+        {/* Error */}
         {!loading && error && (
           <ErrorState
             onRetry={loadProducts}
           />
         )}
 
-        {/* ================================================== */}
-        {/* EMPTY */}
-        {/* ================================================== */}
-
+        {/* Empty */}
         {!loading &&
           !error &&
           products.length === 0 && (
             <EmptyState />
           )}
 
-        {/* ================================================== */}
-        {/* PRODUCTS */}
-        {/* ================================================== */}
-
+        {/* Products */}
         {!loading &&
           !error &&
           products.length > 0 && (
             <>
-              {/* Desktop table */}
+              {/* Desktop Table */}
               <ProductTable
                 products={products}
               />
 
-              {/* Mobile cards */}
-              <div className="space-y-4">
+              {/* Mobile Cards */}
+              <div className="space-y-4 md:hidden">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -565,10 +584,7 @@ function ProductsContent() {
                 ))}
               </div>
 
-              {/* ================================================== */}
-              {/* SHOWING X-Y OF TOTAL */}
-              {/* ================================================== */}
-
+              {/* Result Count */}
               <div className="mt-6 text-sm text-gray-500">
                 Showing{" "}
                 <span className="font-semibold text-gray-900">
@@ -584,16 +600,21 @@ function ProductsContent() {
                 </span>
               </div>
 
-              {/* ================================================== */}
-              {/* PAGINATION */}
-              {/* ================================================== */}
-
+              {/* Pagination */}
               {totalPages > 1 && (
                 <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  onPageChange={handlePageChange}
+                  currentPage={
+                    currentPage
+                  }
+                  totalPages={
+                    totalPages
+                  }
+                  pageSize={
+                    pageSize
+                  }
+                  onPageChange={
+                    handlePageChange
+                  }
                   onPageSizeChange={
                     handlePageSizeChange
                   }
@@ -606,14 +627,9 @@ function ProductsContent() {
   );
 }
 
-/*
- * ==============================================================
- * PAGE COMPONENT
- * ==============================================================
- *
- * Suspense is used because ProductsContent uses
- * useSearchParams().
- */
+// -----------------------------
+// Page wrapper
+// -----------------------------
 
 export default function ProductsPage() {
   return (
