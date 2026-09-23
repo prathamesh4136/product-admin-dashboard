@@ -20,9 +20,15 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        Product Admin Dashboard
-      </h1>
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Product Admin Dashboard
+        </h1>
+
+        <p className="mt-3 text-gray-500">
+          Please sign in to continue.
+        </p>
+      </div>
     </main>
   );
 }
