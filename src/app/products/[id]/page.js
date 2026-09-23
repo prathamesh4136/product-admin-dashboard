@@ -12,6 +12,7 @@ import {
 
 import {
   getProductById,
+  deleteProduct,
 } from "@/services/productService";
 
 import {
@@ -36,6 +37,15 @@ export default function ProductDetailsPage() {
 
   const [authenticated, setAuthenticated] =
     useState(false);
+
+  const [showDeleteDialog, setShowDeleteDialog] =
+    useState(false);
+
+  const [deleting, setDeleting] =
+    useState(false);
+
+  const [deleteError, setDeleteError] =
+    useState("");
 
   // -----------------------------
   // Authentication
@@ -131,6 +141,66 @@ export default function ProductDetailsPage() {
     logout();
     router.replace("/login");
   };
+
+  // -----------------------------
+  // Open delete dialog
+  // -----------------------------
+
+  const handleDeleteClick = () => {
+    setDeleteError("");
+    setShowDeleteDialog(true);
+  };
+
+  // -----------------------------
+  // Cancel delete
+  // -----------------------------
+
+  const handleCancelDelete = () => {
+    if (deleting) return;
+
+    setShowDeleteDialog(false);
+    setDeleteError("");
+  };
+
+  // -----------------------------
+  // Confirm delete
+  // -----------------------------
+
+  const handleConfirmDelete =
+    async () => {
+      // Prevent multiple delete requests.
+      if (deleting) return;
+
+      setDeleting(true);
+      setDeleteError("");
+
+      try {
+        await deleteProduct(
+          productId
+        );
+
+        // DummyJSON simulates deletion.
+        // We remove the product from the
+        // current application flow by
+        // redirecting after success.
+        setShowDeleteDialog(false);
+
+        router.replace(
+          "/products?deleted=true"
+        );
+      } catch (error) {
+        console.error(
+          "Failed to delete product:",
+          error
+        );
+
+        setDeleteError(
+          "Failed to delete product. Please try again."
+        );
+      } finally {
+        setDeleting(false);
+      }
+    };
 
   // -----------------------------
   // Authentication loading
@@ -233,9 +303,19 @@ export default function ProductDetailsPage() {
 
             <button
               onClick={
+                handleDeleteClick
+              }
+              disabled={deleting}
+              className="rounded-lg bg-red-600 px-5 py-2.5 font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete Product
+            </button>
+
+            <button
+              onClick={
                 handleLogout
               }
-              className="rounded-lg bg-red-600 px-5 py-2.5 font-medium text-white transition hover:bg-red-700"
+              className="rounded-lg bg-gray-800 px-5 py-2.5 font-medium text-white transition hover:bg-gray-900"
             >
               Logout
             </button>
@@ -474,6 +554,66 @@ export default function ProductDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+          >
+            <h2
+              id="delete-title"
+              className="text-xl font-bold text-gray-900"
+            >
+              Delete Product?
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-gray-900">
+                {product.title}
+              </span>
+              ? This action cannot be
+              undone.
+            </p>
+
+            {deleteError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={
+                  handleCancelDelete
+                }
+                disabled={deleting}
+                className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleConfirmDelete
+                }
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-5 py-2.5 font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting
+                  ? "Deleting..."
+                  : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

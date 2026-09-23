@@ -101,3 +101,13 @@ export const updateProduct = async (
 
   return response.data;
 };
+
+export const deleteProduct = async (
+  id
+) => {
+  const response = await api.delete(
+    `/products/${id}`
+  );
+
+  return response.data;
+};
