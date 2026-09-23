@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { isAuthenticated, logout } from "@/utils/auth";
 import { getProducts } from "@/services/productService";
@@ -11,33 +16,37 @@ import ProductCard from "@/components/ProductCard";
 import LoadingState from "@/components/LoadingState";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
+import Pagination from "@/components/Pagination";
 
-export default function ProductsPage() {
+const ALLOWED_PAGE_SIZES = [10, 20, 50];
+
+function ProductsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read pagination values from URL
+  const rawPage = Number(searchParams.get("page"));
+  const rawLimit = Number(searchParams.get("limit"));
+
+  const currentPage =
+    Number.isInteger(rawPage) && rawPage > 0
+      ? rawPage
+      : 1;
+
+  const pageSize = ALLOWED_PAGE_SIZES.includes(rawLimit)
+    ? rawLimit
+    : 10;
 
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
 
   const [products, setProducts] = useState([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-
-    try {
-      const data = await getProducts(10, 0);
-
-      setProducts(data.products);
-    } catch (error) {
-      console.error("Failed to load products:", error);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Authentication check
   useEffect(() => {
     const authenticatedUser = isAuthenticated();
 
@@ -50,11 +59,85 @@ export default function ProductsPage() {
     setIsCheckingAuth(false);
   }, [router]);
 
-  useEffect(() => {
-    if (authenticated) {
-      loadProducts();
+  // Load products
+  const loadProducts = useCallback(async () => {
+    if (!authenticated) {
+      return;
     }
-  }, [authenticated, loadProducts]);
+
+    setLoading(true);
+    setError(false);
+
+    try {
+      const skip = (currentPage - 1) * pageSize;
+
+      const data = await getProducts(pageSize, skip);
+
+      setProducts(data.products);
+      setTotalProducts(data.total);
+
+      // Handle invalid page numbers such as ?page=999
+      const calculatedTotalPages = Math.ceil(
+        data.total / pageSize
+      );
+
+      if (
+        currentPage > calculatedTotalPages &&
+        calculatedTotalPages > 0
+      ) {
+        const params = new URLSearchParams(
+          searchParams.toString()
+        );
+
+        params.set("page", String(calculatedTotalPages));
+        params.set("limit", String(pageSize));
+
+        router.replace(`/products?${params.toString()}`);
+      }
+    } catch (error) {
+      console.error("Failed to load products:", error);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    authenticated,
+    currentPage,
+    pageSize,
+    router,
+    searchParams,
+  ]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  const handlePageChange = (page) => {
+    if (page < 1) {
+      return;
+    }
+
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    params.set("page", String(page));
+    params.set("limit", String(pageSize));
+
+    router.push(`/products?${params.toString()}`);
+  };
+
+  const handlePageSizeChange = (newPageSize) => {
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    // Whenever page size changes, go back to page 1
+    params.set("page", "1");
+    params.set("limit", String(newPageSize));
+
+    router.push(`/products?${params.toString()}`);
+  };
 
   const handleLogout = () => {
     logout();
@@ -74,6 +157,20 @@ export default function ProductsPage() {
   if (!authenticated) {
     return null;
   }
+
+  const totalPages = Math.ceil(
+    totalProducts / pageSize
+  );
+
+  const startItem =
+    totalProducts === 0
+      ? 0
+      : (currentPage - 1) * pageSize + 1;
+
+  const endItem = Math.min(
+    currentPage * pageSize,
+    totalProducts
+  );
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -98,7 +195,7 @@ export default function ProductsPage() {
           </button>
         </div>
 
-        {/* Product Content */}
+        {/* Content */}
         {loading && <LoadingState />}
 
         {!loading && error && (
@@ -121,9 +218,52 @@ export default function ProductsPage() {
                 />
               ))}
             </div>
+
+            {/* Showing information */}
+            <div className="mt-6 text-sm text-gray-500">
+              Showing{" "}
+              <span className="font-semibold text-gray-900">
+                {startItem}
+              </span>
+              –
+              <span className="font-semibold text-gray-900">
+                {endItem}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-gray-900">
+                {totalProducts}
+              </span>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            )}
           </>
         )}
       </div>
     </main>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-gray-100">
+          <p className="text-sm text-gray-500">
+            Loading products...
+          </p>
+        </main>
+      }
+    >
+      <ProductsContent />
+    </Suspense>
   );
 }
