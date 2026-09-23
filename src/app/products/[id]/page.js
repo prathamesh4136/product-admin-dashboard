@@ -38,7 +38,7 @@ export default function ProductDetailsPage() {
     useState(false);
 
   // -----------------------------
-  // Authentication check
+  // Authentication
   // -----------------------------
 
   useEffect(() => {
@@ -58,7 +58,10 @@ export default function ProductDetailsPage() {
   // -----------------------------
 
   useEffect(() => {
-    if (!authenticated || !productId) {
+    if (
+      !authenticated ||
+      !productId
+    ) {
       return;
     }
 
@@ -76,15 +79,19 @@ export default function ProductDetailsPage() {
             controller.signal
           );
 
-        if (controller.signal.aborted) {
+        if (
+          controller.signal.aborted
+        ) {
           return;
         }
 
         setProduct(data);
       } catch (error) {
         if (
-          error.code === "ERR_CANCELED" ||
-          error.name === "CanceledError" ||
+          error.code ===
+            "ERR_CANCELED" ||
+          error.name ===
+            "CanceledError" ||
           controller.signal.aborted
         ) {
           return;
@@ -98,7 +105,9 @@ export default function ProductDetailsPage() {
         setError(true);
         setProduct(null);
       } finally {
-        if (!controller.signal.aborted) {
+        if (
+          !controller.signal.aborted
+        ) {
           setLoading(false);
         }
       }
@@ -109,7 +118,10 @@ export default function ProductDetailsPage() {
     return () => {
       controller.abort();
     };
-  }, [authenticated, productId]);
+  }, [
+    authenticated,
+    productId,
+  ]);
 
   // -----------------------------
   // Logout
@@ -121,7 +133,7 @@ export default function ProductDetailsPage() {
   };
 
   // -----------------------------
-  // Loading
+  // Authentication loading
   // -----------------------------
 
   if (!authenticated) {
@@ -133,6 +145,10 @@ export default function ProductDetailsPage() {
       </main>
     );
   }
+
+  // -----------------------------
+  // Product loading
+  // -----------------------------
 
   if (loading) {
     return (
@@ -149,7 +165,7 @@ export default function ProductDetailsPage() {
   }
 
   // -----------------------------
-  // Product not found / error
+  // Product not found
   // -----------------------------
 
   if (error || !product) {
@@ -168,7 +184,9 @@ export default function ProductDetailsPage() {
 
             <button
               onClick={() =>
-                router.push("/products")
+                router.push(
+                  "/products"
+                )
               }
               className="mt-6 rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition hover:bg-blue-700"
             >
@@ -192,19 +210,36 @@ export default function ProductDetailsPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <button
             onClick={() =>
-              router.push("/products")
+              router.push(
+                "/products"
+              )
             }
             className="w-fit rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
             ← Back to Products
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="w-full rounded-lg bg-red-600 px-5 py-2.5 font-medium text-white transition hover:bg-red-700 sm:w-auto"
-          >
-            Logout
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() =>
+                router.push(
+                  `/products/${productId}/edit`
+                )
+              }
+              className="rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition hover:bg-blue-700"
+            >
+              Edit Product
+            </button>
+
+            <button
+              onClick={
+                handleLogout
+              }
+              className="rounded-lg bg-red-600 px-5 py-2.5 font-medium text-white transition hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Product */}
@@ -216,30 +251,42 @@ export default function ProductDetailsPage() {
             <div>
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                 <img
-                  src={product.thumbnail}
-                  alt={product.title}
+                  src={
+                    product.thumbnail
+                  }
+                  alt={
+                    product.title
+                  }
                   className="h-80 w-full object-contain p-6 md:h-96"
                 />
               </div>
 
-              {/* Additional images */}
               {product.images &&
-                product.images.length > 1 && (
+                product.images.length >
+                  1 && (
                   <div className="mt-4 grid grid-cols-4 gap-3">
                     {product.images
-                      .slice(0, 4)
-                      .map((image, index) => (
-                        <div
-                          key={`${image}-${index}`}
-                          className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
-                        >
-                          <img
-                            src={image}
-                            alt={`${product.title} ${index + 1}`}
-                            className="h-20 w-full object-contain p-2"
-                          />
-                        </div>
-                      ))}
+                      .slice(
+                        0,
+                        4
+                      )
+                      .map(
+                        (
+                          image,
+                          index
+                        ) => (
+                          <div
+                            key={`${image}-${index}`}
+                            className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                          >
+                            <img
+                              src={image}
+                              alt={`${product.title} ${index + 1}`}
+                              className="h-20 w-full object-contain p-2"
+                            />
+                          </div>
+                        )
+                      )}
                   </div>
                 )}
             </div>
@@ -248,23 +295,32 @@ export default function ProductDetailsPage() {
             <div>
               <div className="mb-4 flex flex-wrap gap-2">
                 <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium capitalize text-blue-700">
-                  {product.category}
+                  {
+                    product.category
+                  }
                 </span>
 
                 {product.brand && (
                   <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                    {product.brand}
+                    {
+                      product.brand
+                    }
                   </span>
                 )}
               </div>
 
               <h1 className="text-3xl font-bold text-gray-900">
-                {product.title}
+                {
+                  product.title
+                }
               </h1>
 
               <div className="mt-4 flex flex-wrap items-center gap-4">
                 <p className="text-3xl font-bold text-blue-600">
-                  ${product.price}
+                  $
+                  {
+                    product.price
+                  }
                 </p>
 
                 <div className="flex items-center gap-1 rounded-lg bg-yellow-50 px-3 py-1.5">
@@ -273,7 +329,9 @@ export default function ProductDetailsPage() {
                   </span>
 
                   <span className="font-semibold text-gray-800">
-                    {product.rating}
+                    {
+                      product.rating
+                    }
                   </span>
                 </div>
               </div>
@@ -285,7 +343,9 @@ export default function ProductDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-gray-900">
-                    {product.stock}
+                    {
+                      product.stock
+                    }
                   </p>
                 </div>
 
@@ -295,8 +355,10 @@ export default function ProductDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-gray-900">
-                    {product.availabilityStatus ||
-                      "Available"}
+                    {
+                      product.availabilityStatus ||
+                      "Available"
+                    }
                   </p>
                 </div>
               </div>
@@ -307,14 +369,18 @@ export default function ProductDetailsPage() {
                 </h2>
 
                 <p className="mt-2 leading-7 text-gray-600">
-                  {product.description}
+                  {
+                    product.description
+                  }
                 </p>
               </div>
 
               {product.discountPercentage && (
                 <div className="mt-6 rounded-lg bg-green-50 p-4">
                   <p className="text-sm font-medium text-green-700">
-                    {product.discountPercentage}%
+                    {
+                      product.discountPercentage
+                    }%
                     discount available
                   </p>
                 </div>
@@ -329,22 +395,31 @@ export default function ProductDetailsPage() {
                 Reviews
               </h2>
 
-              {product.reviews?.length > 0 && (
+              {product.reviews?.length >
+                0 && (
                 <span className="text-sm text-gray-500">
-                  {product.reviews.length} reviews
+                  {
+                    product.reviews
+                      .length
+                  }{" "}
+                  reviews
                 </span>
               )}
             </div>
 
             {!product.reviews ||
-            product.reviews.length === 0 ? (
+            product.reviews.length ===
+              0 ? (
               <p className="mt-4 text-gray-500">
                 No reviews available.
               </p>
             ) : (
               <div className="mt-6 space-y-4">
                 {product.reviews.map(
-                  (review, index) => (
+                  (
+                    review,
+                    index
+                  ) => (
                     <div
                       key={`${review.reviewerName}-${index}`}
                       className="rounded-lg border border-gray-200 p-4"
@@ -352,11 +427,15 @@ export default function ProductDetailsPage() {
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="font-semibold text-gray-900">
-                            {review.reviewerName}
+                            {
+                              review.reviewerName
+                            }
                           </p>
 
                           <p className="text-sm text-gray-500">
-                            {review.reviewerEmail}
+                            {
+                              review.reviewerEmail
+                            }
                           </p>
                         </div>
 
@@ -366,13 +445,18 @@ export default function ProductDetailsPage() {
                           </span>
 
                           <span className="font-medium text-gray-800">
-                            {review.rating}/5
+                            {
+                              review.rating
+                            }
+                            /5
                           </span>
                         </div>
                       </div>
 
                       <p className="mt-3 text-gray-600">
-                        {review.comment}
+                        {
+                          review.comment
+                        }
                       </p>
 
                       {review.date && (

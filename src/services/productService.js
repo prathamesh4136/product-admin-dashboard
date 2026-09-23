@@ -79,9 +79,23 @@ export const getProductById = async (
   return response.data;
 };
 
-export const addProduct = async (product) => {
+export const addProduct = async (
+  product
+) => {
   const response = await api.post(
     "/products/add",
+    product
+  );
+
+  return response.data;
+};
+
+export const updateProduct = async (
+  id,
+  product
+) => {
+  const response = await api.put(
+    `/products/${id}`,
     product
   );
 
